@@ -35,7 +35,7 @@
 
 
 import threading
-import Queue
+import queue
 import time, random
 import telnetlib
 import datetime
@@ -81,7 +81,7 @@ class CallMonitor(ExceptionLoggingThread):
             line = ""
             while (not self._stop.isSet() and not line.endswith("\n")):
                 try:
-                    line = line + self.tn.read_until("\n", timeout=5)        # Wait until one line data was readed from the telnet connection.
+                    line = line + self.tn.read_until(b"\n", timeout=5).decode('iso-8859-1')       # Wait until one line data was readed from the telnet connection.
                 except AttributeError:
                         self.logger.error("Cannot read input data from telnet service. Maybe the telnet connection is broken. Stop the service.")
                         self._stop.set()

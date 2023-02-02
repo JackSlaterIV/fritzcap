@@ -37,9 +37,9 @@ import sys, platform, signal
 import datetime
 import re
 import argparse
-import ConfigParser
+import configparser
 import threading
-import Queue
+import queue
 import time, random
 import getpass
 
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     main_args.add_argument('-u', '--username', default='root', metavar='username', type=str, help='the username to login to the box (Default:\'root\')')
     main_args.add_argument('-s', '--show_interfaces', default=None, action='store_true', help='shows the interfaces as key/description pairs')
 
-    ext_args.add_argument('--config_file', default='fritzcap.conf', metavar='path_to_file', type=file, help='the fritzcap configuration file (Default:\'fritzcap.conf\')')
+    ext_args.add_argument('--config_file', default='fritzcap.conf', metavar='path_to_file', type=argparse.FileType('r'), help='the fritzcap configuration file (Default:\'fritzcap.conf\')')
     ext_args.add_argument('--logging_config', default=None, metavar='path_to_file', type=str, help='the fritzcap logging configuration file (Default:\'logging.conf\')')
     ext_args.add_argument('--box_name', default=None, metavar='host_or_IP', type=str, help='the host name or IP address of the FritzBox (Default:\'fritz.box\')')
     ext_args.add_argument('--call_service_port', default=None, metavar='port', type=int, help='the port number of the FritzBox call monitor telnet service (Default:1012)')
@@ -145,8 +145,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # read the config file
-    config = ConfigParser.RawConfigParser()
-    config.readfp(args.config_file)
+    config = configparser.RawConfigParser()
+    config.read_file(args.config_file)
 
     # set the defaults
     defaults = {"capture_files": False,
@@ -162,7 +162,7 @@ if __name__ == '__main__':
                 "protocol": "http",
                 "cap_folder": "captures/%(tcaps.Y-m-d/HMS)/",
                 "cap_file": "capture.cap",
-                "cap_interface": " ", # needs to be a space as empty string fails with `TypeError: cannot concatenate 'str' and 'NoneType' objects`
+                "cap_interface": "",
                 "after_capture_time": 10,
                 "decode_workers_count": 2,
                 "after_capture_time": 10,
@@ -174,7 +174,7 @@ if __name__ == '__main__':
                 }
 
     # read the values from commandline parameter -> config parameters -> default value
-    for key, default_value in defaults.items():
+    for key, default_value in list(defaults.items()):
         value = None
         if (args.__contains__(key)):
             value = args.__getattribute__(key)
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     ######################################
     if (args.decode_files is not None):
         nothing_to_do = False
-        work_queue = Queue.Queue(0)
+        work_queue = queue.Queue(0)
 
         if (args.decode_workers_count < 1):
             logger.warning("The workers count is '< 1' now and will be set to '1'. At least 1 worker have to be active to do decode work.")

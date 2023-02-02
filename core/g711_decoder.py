@@ -148,21 +148,21 @@ class G711Decoder:
         # Write RIFF header
         sd['fo'].write(struct.pack("<BBBBLBBBBBBBBBBBBHHLLHHBBBBBBBBBBLBBBBL",
                 0x52, 0x49, 0x46, 0x46,                                 # 'RIFF'
-                (sd['blockalign'] * sd['nr_samples']) + 50,             # total file size (data + sizeof(waveheader) - 8)
+                (int(sd['blockalign']) * int(sd['nr_samples'])) + 50,             # total file size (data + sizeof(waveheader) - 8)
                 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,         # 'WAVEfmt '
                 0x12, 0x00, 0x00, 0x00,                                 # chunk data size
-                sd['format'],                                           # format tag
-                sd['channels'],                                         # number of channels
-                sd['samplerate'],                                       # sample rate in Hz = 8000
-                sd['samplerate'] * sd['blockalign'],                    # avg bytes per second equals to sample rate for 8 bit, twice sample rate for 16 bit
-                sd['blockalign'],                                       # blockalign
-                sd['bitspersample'],                                    # significant bits per sample
+                int(sd['format']),                                           # format tag
+                int(sd['channels']),                                         # number of channels
+                int(sd['samplerate']),                                       # sample rate in Hz = 8000
+                int(sd['samplerate']) * int(sd['blockalign']),                    # avg bytes per second equals to sample rate for 8 bit, twice sample rate for 16 bit
+                int(sd['blockalign']),                                       # blockalign
+                int(sd['bitspersample']),                                    # significant bits per sample
                 0x00, 0x00,                                             # extra format bytes
                 0x66, 0x61, 0x63, 0x74,                                 # 'fact'
                 0x04, 0x00, 0x00, 0x00,                                 # chunk data size
-                sd['nr_samples'],                                       # fact chunk, unsigned long #samples, offset 46
+                int(sd['nr_samples']),                                       # fact chunk, unsigned long #samples, offset 46
                 0x64, 0x61, 0x74, 0x61,                                 # 'data'
-                sd['blockalign'] * sd['nr_samples'],                    # data chunk, unsigned long #samples in byte, offset 54
+                int(sd['blockalign']) * int(sd['nr_samples']),                    # data chunk, unsigned long #samples in byte, offset 54
                 )
         )
 
@@ -201,7 +201,7 @@ class G711Decoder:
                 # Find the SSI of current stream in stream descriptor array. If not contained, allocate a slot and add it
                 sd = self.find_sd_slot(ssi)
                 # Set time of first appearance of this particular stream
-                if not sd.has_key('first_seen_at'):
+                if 'first_seen_at' not in sd:
                     sd['first_seen_at'] =  datetime.datetime.fromtimestamp(time_sec) + datetime.timedelta(microseconds = time_usec)
                     # Take over ip source/destination information
                     (src_ip, dst_ip) = struct.unpack('>LL', packet[candidate['offs']-28 : candidate['offs']-20])
@@ -223,7 +223,7 @@ class G711Decoder:
                             sd['format'] = 7            # CCITT G.711 u
                         sd['bitspersample'] = 8         # 8 bit
 
-                    sd['blockalign'] = sd['bitspersample'] / 8 * sd['channels']
+                    sd['blockalign'] = sd['bitspersample'] // 8 * sd['channels']
 
                     # Open target file for stream
                     sd['fo'] = open("%s_%d_.wav" % (self.file, sd['index']), 'wb+')
@@ -232,7 +232,7 @@ class G711Decoder:
                     self.write_RIFF_header(sd)
 
                 # Do we already have received a sequence number? If yes, check whether we are in sequence
-                if sd.has_key('expected') and seqnr != sd['expected']:
+                if 'expected' in sd and seqnr != sd['expected']:
                     sd['errors'] += 1
                     lost = abs(sd['expected']-seqnr)
                 else:
@@ -243,12 +243,12 @@ class G711Decoder:
 
                 # Comfort Noise?
                 if payloadtype == 13:
-                    if not sd.has_key('ts_cn'):
+                    if 'ts_cn' not in sd:
                         sd['ts_cn'] = timestamp # Indicates the number of samples
                         return                  # Just react on the first seen CN packet
                 else:
                     # Was there a CN sequence before?
-                    if sd.has_key('ts_cn'):
+                    if 'ts_cn' in sd:
                         pad = array.array('B', (0 for i in range(sd['blockalign']*(timestamp - sd['ts_cn'])))) # Silence
                         sd['fo'].write(pad)
                         sd['nr_samples'] += timestamp - sd['ts_cn']
@@ -268,14 +268,14 @@ class G711Decoder:
                 # This takes a lot of time...
                 if payloadtype == 8:
                     if self.linearize:
-                        audio = array.array('h', (self.alaw2linear[ord(packet[i])] for i in range(start,end)))
+                        audio = array.array('h', (self.alaw2linear[packet[i]] for i in range(start,end)))
                     else:
-                        audio = array.array('B', (ord(packet[i]) for i in range(start,end)))
+                        audio = array.array('B', (packet[i] for i in range(start,end)))
                 else:
                     if self.linearize:
-                        audio = array.array('h', (self.ulaw2linear[ord(packet[i])] for i in range(start,end)))
+                        audio = array.array('h', (self.ulaw2linear[packet[i]] for i in range(start,end)))
                     else:
-                        audio = array.array('B', (ord(packet[i]) for i in range(start,end)))
+                        audio = array.array('B', (packet[i] for i in range(start,end)))
 
                 sd['fo'].write(audio)
                 sd['nr_samples'] += candidate['chunk']
@@ -316,7 +316,7 @@ class G711Decoder:
                                 follower = sd
 
                             # Calculate missing samples for follower and resulting total sample count for the mix (125 usec per sample at 8000 Hz)
-                            follower_samples_behind = int((timediff.seconds*1000000.0 + timediff.microseconds)  / 125)
+                            follower_samples_behind = int((timediff.seconds*1000000.0 + timediff.microseconds)  // 125)
 
                             total_samples = follower_samples_behind + max(leader['nr_samples'] - follower_samples_behind, follower['nr_samples'])
 
@@ -357,7 +357,7 @@ class G711Decoder:
                                     sum = -32768
                                 # Write the sum. Would be faster to write it into an array here and flush that to disk afterwards
                                 # But the array could blow the memory, hence we write it as we have it
-                                sdmix['fo'].write(struct.pack("<h", sum))
+                                sdmix['fo'].write(struct.pack("<h", int(sum)))
 
                             total_samples_written += mixed_cnt
 
@@ -377,7 +377,7 @@ class G711Decoder:
                                     total_samples_written += follower_rest
                                     self.logger.debug("Rest taken from follower: %d" % follower_rest)
                             sdmix['fo'].close()
-                            duration_in_seconds = int((total_samples_written * 125) / 1000000.0)
+                            duration_in_seconds = int((total_samples_written * 125) // 1000000.0)
                             self.logger.debug("Total mixed samples written: %d (duration %s h)" % (total_samples_written,  str(datetime.time(duration_in_seconds // 3600, (duration_in_seconds % 3600) // 60, duration_in_seconds % 60))))
             # Close
             sd['fo'].close()
