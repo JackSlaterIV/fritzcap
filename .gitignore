@@ -1,3 +1,7 @@
 log_*_fritzcap.txt
 core/*.pyc
 captures
+venv*/
+.vscode/
+*.pyo
+local*.conf
